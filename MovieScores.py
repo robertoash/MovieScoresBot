@@ -80,6 +80,7 @@ class MyClass(object):
             return MOVIECHOICE
         else:
             update.message.reply_text("No results found.")
+            return ConversationHandler.END
 
         rightmovie = self.movielist[rightmovieindex]
         update.message.reply_text('"' + rightmovie["name"] + '"' + " scored a " + str(rightmovie["meterScore"]) + " on Rotten Tomatoes.")
@@ -94,7 +95,8 @@ class MyClass(object):
                 rightmovieindex = int(msg) - 1
                 break
             except ValueError:
-                update.message.reply_text("That's not a valid option!")
+                update.message.reply_text("That's not a valid option! Please type the number corresponding to the right title.")
+                return MOVIECHOICE
 
         rightmovie = self.movielist[rightmovieindex]
         update.message.reply_text('"' + rightmovie["name"] + '"' + " scored a " + str(rightmovie["meterScore"]) + " on Rotten Tomatoes.")
