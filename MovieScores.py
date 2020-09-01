@@ -16,9 +16,9 @@ bot.
 
 import telegramsecrets as ts
 import logging
-from telegram import (ReplyKeyboardMarkup)  # , ReplyKeyboardRemove)
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
-from rotten_tomatoes_client import RottenTomatoesClient
+# from telegram import (ReplyKeyboardMarkup)  # , ReplyKeyboardRemove)
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler  # pip install python-telegram-bot --upgrade
+from rotten_tomatoes_client import RottenTomatoesClient  # pip install rotten_tomatoes_client
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -36,26 +36,27 @@ class MyClass(object):
     # Define a few command handlers. These usually take the two arguments update and
     # context. Error handlers also receive the raised TelegramError object in error.
     def start(self, update, context):
-        reply_keyboard = [['Movie', 'TV Show']]
+        # reply_keyboard = [['Movie', 'TV Show']]
         update.message.reply_text(
             'Hi! I am here to search Scores for you. '
-            'Send /cancel to stop talking to me.\n\n'
-            'What are you trying to find?',
-            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+            'You can send /cancel to stop talking to me.\n\n'
+            'What movie are you trying to find?')  # ,
+            # reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
 
-        return CATCHOICE
+        return MOVIESEARCH
+        # return CATCHOICE
 
-    def catchoice(self, update, context):
-        msg = update.message.text
-        logger.info(msg)
-        if msg == "Movie":
-            update.message.reply_text("Great! Let's search for a movie! What movie would you like to search for?")
-            return MOVIESEARCH
-        else:
-            update.message.reply_text("Sorry. Can't search for TV Shows yet :(")
-            return ConversationHandler.END
-            # update.message.reply_text("Great! Let's search for a TV Show! What show would you like to search for?", reply_markup=ReplyKeyboardRemove())
-            # return TVSEARCH
+    # def catchoice(self, update, context):
+    #     msg = update.message.text
+    #     logger.info(msg)
+    #     if msg == "Movie":
+    #         update.message.reply_text("Great! Let's search for a movie! What movie would you like to search for?")
+    #         return MOVIESEARCH
+    #     else:
+    #         update.message.reply_text("Sorry. Can't search for TV Shows yet :(")
+    #         return ConversationHandler.END
+    #         # update.message.reply_text("Great! Let's search for a TV Show! What show would you like to search for?", reply_markup=ReplyKeyboardRemove())
+    #         # return TVSEARCH
 
     def moviesearch(self, update, context):
         # user = update.message.from_user
@@ -74,7 +75,7 @@ class MyClass(object):
             count = 0
             response = []
             for item in self.movielist:
-                response.append((str(count + 1) + ". " + item["name"])+'\n')
+                response.append((str(count + 1) + ". " + item["name"]) + ' (' + str(item["year"]) + ')\n')
                 count += 1
             update.message.reply_text("".join(response))
             return MOVIECHOICE
@@ -132,7 +133,7 @@ def main():
         entry_points=[CommandHandler('start', a.start)],
 
         states={
-            CATCHOICE: [MessageHandler(Filters.regex('^(Movie|TV Show)$'), a.catchoice)],
+            # CATCHOICE: [MessageHandler(Filters.regex('^(Movie|TV Show)$'), a.catchoice)],
             MOVIESEARCH: [MessageHandler(Filters.text & ~Filters.command, a.moviesearch)],
             MOVIECHOICE: [MessageHandler(Filters.text & ~Filters.command, a.moviechoice)]  # ,
             # TVSEARCH: [MessageHandler(Filters.text & ~Filters.command, a.tvsearch)],
@@ -153,6 +154,7 @@ def main():
 
     # Start the Bot
     updater.start_polling()
+    logger.info("Listening...")
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
