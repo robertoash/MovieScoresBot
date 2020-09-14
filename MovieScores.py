@@ -14,11 +14,11 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
-import telegramsecrets as ts
 import logging
-# from telegram import (ReplyKeyboardMarkup)  # , ReplyKeyboardRemove)
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler  # pip install python-telegram-bot --upgrade
-from rotten_tomatoes_client import RottenTomatoesClient  # pip install rotten_tomatoes_client
+import telegramsecrets as ts
+import omdb # pip intall omdb
+import omdbsecrets as omdbs
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -44,19 +44,6 @@ class MyClass(object):
             # reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
 
         return MOVIESEARCH
-        # return CATCHOICE
-
-    # def catchoice(self, update, context):
-    #     msg = update.message.text
-    #     logger.info(msg)
-    #     if msg == "Movie":
-    #         update.message.reply_text("Great! Let's search for a movie! What movie would you like to search for?")
-    #         return MOVIESEARCH
-    #     else:
-    #         update.message.reply_text("Sorry. Can't search for TV Shows yet :(")
-    #         return ConversationHandler.END
-    #         # update.message.reply_text("Great! Let's search for a TV Show! What show would you like to search for?", reply_markup=ReplyKeyboardRemove())
-    #         # return TVSEARCH
 
     def moviesearch(self, update, context):
         # user = update.message.from_user
@@ -64,18 +51,17 @@ class MyClass(object):
         update.message.reply_text('Searching...')
 
         """Find Movie Scores"""
-        result = RottenTomatoesClient.search(term=update.message.text, limit=10)
-        # update.message.reply_text(result)
-        self.movielist = result["movies"]
+        omdb.set_default('apikey', omdbs.omdbkey)
+        self.movielist = omdb.search_movie(update.message.text)
         if len(self.movielist) == 1:
             rightmovieindex = 0
         elif len(self.movielist) > 1:
             # update.message.reply_text(
-            update.message.reply_text("Received " + str(len(result["movies"])) + " results. Please pick the right movie (reply with number): ")
+            update.message.reply_text("Received " + str(len(self.movielist)) + " results. Please pick the right movie (reply with number):")
             count = 0
             response = []
             for item in self.movielist:
-                response.append((str(count + 1) + ". " + item["name"]) + ' (' + str(item["year"]) + ')\n')
+                response.append((str(count + 1) + ". " + item["title"]) + ' (' + str(item["year"]) + ')\n')
                 count += 1
             update.message.reply_text("".join(response))
             return MOVIECHOICE
@@ -84,7 +70,13 @@ class MyClass(object):
             return ConversationHandler.END
 
         rightmovie = self.movielist[rightmovieindex]
-        update.message.reply_text('"' + rightmovie["name"] + '"' + " scored a " + str(rightmovie["meterScore"]) + " on Rotten Tomatoes.")
+        rightmovieimdbid = rightmovie['imdb_id']
+        rightfull = omdb.imdbid(rightmovieimdbid, tomatoes=False)
+
+        ratings = ['"' + rightfull["title"] + '"' + " scored:\n"]
+        for item in rightfull["ratings"]:
+            ratings.append(item['source'] + ': ' + item['value'] + '\n')
+        update.message.reply_text("".join(ratings))
 
         return ConversationHandler.END
 
@@ -100,7 +92,13 @@ class MyClass(object):
                 return MOVIECHOICE
 
         rightmovie = self.movielist[rightmovieindex]
-        update.message.reply_text('"' + rightmovie["name"] + '"' + " scored a " + str(rightmovie["meterScore"]) + " on Rotten Tomatoes.")
+        rightmovieimdbid = rightmovie['imdb_id']
+        rightfull = omdb.imdbid(rightmovieimdbid, tomatoes=False)
+
+        ratings = ['"' + rightfull["title"] + '"' + " has these scores:\n"]
+        for item in rightfull["ratings"]:
+            ratings.append(item['source'] + ': ' + item['value'] + '\n')
+        update.message.reply_text("".join(ratings))
 
         return ConversationHandler.END
 
@@ -133,11 +131,8 @@ def main():
         entry_points=[CommandHandler('start', a.start)],
 
         states={
-            # CATCHOICE: [MessageHandler(Filters.regex('^(Movie|TV Show)$'), a.catchoice)],
             MOVIESEARCH: [MessageHandler(Filters.text & ~Filters.command, a.moviesearch)],
-            MOVIECHOICE: [MessageHandler(Filters.text & ~Filters.command, a.moviechoice)]  # ,
-            # TVSEARCH: [MessageHandler(Filters.text & ~Filters.command, a.tvsearch)],
-            # TVCHOICE: [MessageHandler(Filters.text & ~Filters.command, a.tvchoice)]
+            MOVIECHOICE: [MessageHandler(Filters.text & ~Filters.command, a.moviechoice)]
         },
 
         fallbacks=[CommandHandler('cancel', a.cancel)]
