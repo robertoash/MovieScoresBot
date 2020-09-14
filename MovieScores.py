@@ -17,7 +17,7 @@ bot.
 import logging
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler  # pip install python-telegram-bot --upgrade
 import telegramsecrets as ts
-import omdb # pip intall omdb
+import omdb # pip install omdb
 import omdbsecrets as omdbs
 
 # Enable logging
