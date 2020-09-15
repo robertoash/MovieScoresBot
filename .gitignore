@@ -6,3 +6,5 @@ sftp-config.json
 traktsecrets.py
 temp.py
 omdbsecrets.py
+tmdbsecrets.py
+utellyapisecrets.py

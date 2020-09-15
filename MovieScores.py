@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+
 # This program is dedicated to the public domain under the CC0 license.
 
 """
@@ -16,15 +16,32 @@ bot.
 
 import logging
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler  # pip install python-telegram-bot --upgrade
-import telegramsecrets as ts
-import omdb # pip install omdb
-import omdbsecrets as omdbs
+import omdb  # pip install omdb
+import tmdbsimple as tmdb  # pip install tmdbsimple
+from trakt import Trakt  # pip install trakt.py
+import requests
+
+from secrets import omdbsecrets as omdbs
+from secrets import telegramsecrets as ts
+from secrets import traktsecrets as trkts
+from secrets import tmdbsecrets as tmdbs
+from secrets import utellyapisecrets as uts
+
+
+# Load secrets
+telegramtoken = ts.token
+omdb.set_default('apikey', omdbs.omdbkey)
+tmdb.API_KEY = tmdbs.key
+Trakt.configuration.defaults.client(id=trkts.traktid, secret=trkts.traktkey)
+utellyheaders = {'x-rapidapi-host': uts.host, 'x-rapidapi-key': uts.key}
+
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
+
 
 CATCHOICE, MOVIESEARCH, MOVIECHOICE, TVSEARCH, TCHOICE = range(5)
 
@@ -40,26 +57,24 @@ class MyClass(object):
         update.message.reply_text(
             'Hi! I am here to search Scores for you. '
             'You can send /cancel to stop talking to me.\n\n'
-            'What movie are you trying to find?')  # ,
-            # reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+            'What movie are you trying to find?')
 
         return MOVIESEARCH
 
     def moviesearch(self, update, context):
         # user = update.message.from_user
         logger.info(update.message.text)
-        update.message.reply_text('Searching...')
+        # update.message.reply_text('Searching...')
 
         """Find Movie Scores"""
-        omdb.set_default('apikey', omdbs.omdbkey)
         self.movielist = omdb.search_movie(update.message.text)
         if len(self.movielist) == 1:
             rightmovieindex = 0
         elif len(self.movielist) > 1:
             # update.message.reply_text(
-            update.message.reply_text("Received " + str(len(self.movielist)) + " results. Please pick the right movie (reply with number):")
-            count = 0
             response = []
+            response.append("Received " + str(len(self.movielist)) + " results. Please pick the right one:\n")
+            count = 0
             for item in self.movielist:
                 response.append((str(count + 1) + ". " + item["title"]) + ' (' + str(item["year"]) + ')\n')
                 count += 1
@@ -71,12 +86,56 @@ class MyClass(object):
 
         rightmovie = self.movielist[rightmovieindex]
         rightmovieimdbid = rightmovie['imdb_id']
-        rightfull = omdb.imdbid(rightmovieimdbid, tomatoes=False)
 
+        # Get OMDB ratings (IMDB, RottenTomatoes, Metacritic)
+        rightfull = omdb.imdbid(rightmovieimdbid, tomatoes=False)
         ratings = ['"' + rightfull["title"] + '"' + " scored:\n"]
         for item in rightfull["ratings"]:
-            ratings.append(item['source'] + ': ' + item['value'] + '\n')
+            if item['source'] == 'Metacritic':
+                ratings.append(item['source'] + ': ' + str(item['value']).split("/")[0] + '%\n')
+            elif item['source'] == 'Internet Movie Database':
+                ratings.append('IMDB: ' + str(round(float(item['value'].split("/")[0])*10)) + '%\n')
+            else:
+                ratings.append(item['source'] + ': ' + item['value'] + '\n')
+
+        # Get TMDB ratings
+        find = tmdb.Find(rightmovieimdbid)
+        movie = find.info(external_source='imdb_id')
+        tmdbrating = str(round(movie['movie_results'][0]['vote_average']*10))+'%'
+        ratings.append('TMDB: ' + tmdbrating + '\n')
+
+        # Get Trakt ratings
+        movie = Trakt['search'].lookup(rightmovieimdbid, 'imdb', extended='full')
+        moviedict = movie[0].to_dict()
+        traktscore = str(round(moviedict['rating']*10))+'%'
+        ratings.append('Trakt: ' + traktscore + '\n')
+
+        # Build ratings message
         update.message.reply_text("".join(ratings))
+
+        # Get Trakt trailer
+        trakttrailer = moviedict['trailer']
+        update.message.reply_text("You can watch the trailer here: " + trakttrailer)
+
+        # Get watch locations from Utelly API (https://rapidapi.com/utelly/api/utelly/endpoints)
+        url = "https://utelly-tv-shows-and-movies-availability-v1.p.rapidapi.com/idlookup"
+        querystring = {
+                        "country": "se",
+                        "source_id": rightmovieimdbid,
+                        "source": "imdb"
+                        }
+
+        response = requests.request("GET", url, headers=utellyheaders, params=querystring)
+        respdict = response.json()
+        if 'locations' in respdict['collection']:
+            locations = ["It is available to watch here:\n"]
+            for item in respdict['collection']['locations']:
+                locations.append(item['display_name']+'\n')
+        else:
+            locations = ["This movie is not available for streaming."]
+
+        # Build locations message
+        update.message.reply_text("".join(locations))
 
         return ConversationHandler.END
 
@@ -93,12 +152,56 @@ class MyClass(object):
 
         rightmovie = self.movielist[rightmovieindex]
         rightmovieimdbid = rightmovie['imdb_id']
-        rightfull = omdb.imdbid(rightmovieimdbid, tomatoes=False)
 
-        ratings = ['"' + rightfull["title"] + '"' + " has these scores:\n"]
+        # Get OMDB ratings (IMDB, RottenTomatoes, Metacritic)
+        rightfull = omdb.imdbid(rightmovieimdbid, tomatoes=False)
+        ratings = ['"' + rightfull["title"] + '"' + " scored:\n"]
         for item in rightfull["ratings"]:
-            ratings.append(item['source'] + ': ' + item['value'] + '\n')
+            if item['source'] == 'Metacritic':
+                ratings.append(item['source'] + ': ' + str(item['value']).split("/")[0] + '%\n')
+            elif item['source'] == 'Internet Movie Database':
+                ratings.append('IMDB: ' + str(round(float(item['value'].split("/")[0])*10)) + '%\n')
+            else:
+                ratings.append(item['source'] + ': ' + item['value'] + '\n')
+
+        # Get TMDB ratings
+        find = tmdb.Find(rightmovieimdbid)
+        movie = find.info(external_source='imdb_id')
+        tmdbrating = str(round(movie['movie_results'][0]['vote_average']*10))+'%'
+        ratings.append('TMDB: ' + tmdbrating + '\n')
+
+        # Get Trakt ratings
+        movie = Trakt['search'].lookup(rightmovieimdbid, 'imdb', extended='full')
+        moviedict = movie[0].to_dict()
+        traktscore = str(round(moviedict['rating']*10))+'%'
+        ratings.append('Trakt: ' + traktscore + '\n')
+
+        # Build ratings message
         update.message.reply_text("".join(ratings))
+
+        # Get Trakt trailer
+        trakttrailer = moviedict['trailer']
+        update.message.reply_text("You can watch the trailer here: " + trakttrailer)
+
+        # Get watch locations from Utelly API (https://rapidapi.com/utelly/api/utelly/endpoints)
+        url = "https://utelly-tv-shows-and-movies-availability-v1.p.rapidapi.com/idlookup"
+        querystring = {
+                        "country": "se",
+                        "source_id": rightmovieimdbid,
+                        "source": "imdb"
+                        }
+
+        response = requests.request("GET", url, headers=utellyheaders, params=querystring)
+        respdict = response.json()
+        if 'locations' in respdict['collection']:
+            locations = ["It is available to watch here:\n"]
+            for item in respdict['collection']['locations']:
+                locations.append(item['display_name']+'\n')
+        else:
+            locations = ["This movie is not available for streaming."]
+
+        # Build locations message
+        update.message.reply_text("".join(locations))
 
         return ConversationHandler.END
 
@@ -121,7 +224,7 @@ def main():
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
     # Post version 12 this will no longer be necessary
-    updater = Updater(ts.token, use_context=True)
+    updater = Updater(telegramtoken, use_context=True)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
