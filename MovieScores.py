@@ -15,10 +15,10 @@ bot.
 """
 
 import logging
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler  # pip install python-telegram-bot --upgrade
-import omdb  # pip install omdb
-import tmdbsimple as tmdb  # pip install tmdbsimple
-from trakt import Trakt  # pip install trakt.py
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler  # pip3 install python-telegram-bot --upgrade
+import omdb  # pip3 install omdb
+import tmdbsimple as tmdb  # pip3 install tmdbsimple
+from trakt import Trakt  # pip3 install trakt.py
 import requests
 
 from secrets import omdbsecrets as omdbs
