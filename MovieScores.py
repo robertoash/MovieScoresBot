@@ -252,7 +252,7 @@ def main():
 
     # Start the Bot
     updater.start_polling()
-    logger.info("Listening...")
+    logger.info("MovieScoresBot is Listening...")
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
